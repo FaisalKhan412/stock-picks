@@ -1,25 +1,50 @@
-// Stock symbols configuration (USE .BO for BSE or .NS for NSE)
+// config.js - Updated for Yahoo Finance API
 const STOCKS = {
   longTerm: [
-    { symbol: "RELIANCE.BO", notes: "Strong fundamentals" },  // BSE
-    { symbol: "INFY.NS", notes: "Consistent revenue growth" }, // NSE (sometimes more reliable)
-    { symbol: "TATAMOTORS.BO", notes: "Test stock" }  // For verification
+    { 
+      symbol: "RELIANCE.NS", 
+      notes: "Strong fundamentals",
+      exchange: "NSE"
+    },
+    { 
+      symbol: "INFY.NS", 
+      notes: "Consistent revenue growth",
+      exchange: "NSE"
+    }
   ],
   shortTerm: [
-    { symbol: "HDFCBANK.BO", notes: "Oversold conditions" },  // BSE
-    { symbol: "TCS.NS", notes: "Technical breakout" }  // NSE
+    { 
+      symbol: "TATASTEEL.NS", 
+      notes: "Technical breakout",
+      exchange: "NSE"
+    },
+    { 
+      symbol: "HDFCBANK.NS", 
+      notes: "Oversold conditions",
+      exchange: "NSE" 
+    }
   ]
 };
 
-// API Configuration (Alpha Vantage)
+// API Configuration (Yahoo Finance)
 const API_CONFIG = {
-  apiKey: "6CUWCEKKTSLIXQ7L", // Your API key
-  baseUrl: "https://www.alphavantage.co/query",
-  function: "GLOBAL_QUOTE", // For stock prices
-  forexFunction: "CURRENCY_EXCHANGE_RATE", // For USD to INR conversion
-  fromCurrency: "USD",
-  toCurrency: "INR"
+  baseUrl: "https://query1.finance.yahoo.com/v8/finance/chart",
+  region: "IN",
+  interval: "1d",
+  range: "1d"
 };
 
-// Fallback exchange rate if API fails (1 USD = ~83 INR as of 2023)
-const FALLBACK_EXCHANGE_RATE = 83; 
+// Display Settings
+const DISPLAY = {
+  currency: "₹",
+  decimalPlaces: 2,
+  showExchange: false // Set to true to display (NSE) after symbols
+};
+
+// Fallback Data (if API fails)
+const FALLBACK_DATA = {
+  "RELIANCE.NS": { price: 2450.50, changePercent: 1.25 },
+  "INFY.NS": { price: 1650.30, changePercent: -0.50 },
+  "TATASTEEL.NS": { price: 120.75, changePercent: 2.10 },
+  "HDFCBANK.NS": { price: 1605.60, changePercent: -1.20 }
+};

@@ -1,121 +1,99 @@
-// [Previous DOM elements and tab switching code remains the same]
+// DOM Elements (keep your existing elements)
+const loadingEl = document.getElementById('loading');
+const errorEl = document.getElementById('error');
 
-let usdToInrRate = 75.00; // Default fallback rate
-
-// Fetch USD to INR conversion rate
-async function fetchExchangeRate() {
-  try {
-    const url = `${API_CONFIG.baseUrl}?function=${API_CONFIG.forexFunction}&from_currency=${API_CONFIG.fromCurrency}&to_currency=${API_CONFIG.toCurrency}&apikey=${API_CONFIG.apiKey}`;
-    const response = await fetch(url);
-    
-    if (!response.ok) throw new Error('Network response was not ok');
-    
-    const data = await response.json();
-    
-    if (data['Error Message'] || data['Note']) {
-      throw new Error(data['Error Message'] || data['Note']);
-    }
-    
-    const rate = parseFloat(data['Realtime Currency Exchange Rate']['5. Exchange Rate']);
-    return rate || usdToInrRate;
-  } catch (error) {
-    console.error('Error fetching exchange rate:', error);
-    return usdToInrRate; // Return default rate if API fails
-  }
-}
-
-// Fetch stock data (updated for INR conversion)
+// New API Configuration (Yahoo Finance - no CORS issues)
 async function fetchStockData(symbol) {
   try {
-    const url = `${API_CONFIG.baseUrl}?function=${API_CONFIG.stockFunction}&symbol=${symbol}&apikey=${API_CONFIG.apiKey}`;
-    const response = await fetch(url);
+    loadingEl.classList.remove('hidden');
+    errorEl.classList.add('hidden');
     
-    if (!response.ok) throw new Error('Network response was not ok');
-    
+    // Yahoo Finance API (works directly in browser)
+    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?region=IN`);
     const data = await response.json();
     
-    if (data['Error Message'] || data['Note']) {
-      throw new Error(data['Error Message'] || data['Note']);
-    }
+    if (!data.chart?.result) throw new Error('Invalid symbol or no data');
     
-    return data['Global Quote'] || null;
+    const price = data.chart.result[0].meta.regularMarketPrice.toFixed(2);
+    const changePercent = (
+      ((data.chart.result[0].meta.regularMarketPrice - 
+       data.chart.result[0].meta.chartPreviousClose) / 
+       data.chart.result[0].meta.chartPreviousClose * 100
+    ).toFixed(2);
+    
+    return {
+      price: '₹' + price,
+      change: changePercent + '%',
+      rawChange: changePercent
+    };
   } catch (error) {
-    console.error('Error fetching data for', symbol, error);
-    throw error;
-  }
-}
-
-// Update table with stock data (now in INR)
-async function updateStocks() {
-  loadingEl.classList.remove('hidden');
-  errorEl.classList.add('hidden');
-  statusEl.textContent = '';
-  
-  try {
-    // First get current exchange rate
-    usdToInrRate = await fetchExchangeRate();
-    
-    // Clear tables
-    longTable.innerHTML = '';
-    shortTable.innerHTML = '';
-    
-    // Process long term stocks
-    for (const stock of STOCKS.longTerm) {
-      const quote = await fetchStockData(stock.symbol);
-      const row = createStockRow(stock, quote, usdToInrRate);
-      longTable.appendChild(row);
-    }
-    
-    // Process short term stocks
-    for (const stock of STOCKS.shortTerm) {
-      const quote = await fetchStockData(stock.symbol);
-      const row = createStockRow(stock, quote, usdToInrRate);
-      shortTable.appendChild(row);
-    }
-    
-    statusEl.textContent = `Last updated: ${new Date().toLocaleTimeString()} | 1 USD = ${usdToInrRate.toFixed(2)} INR`;
-  } catch (error) {
-    errorMsg.textContent = `Error: ${error.message || 'Failed to load stock data'}`;
+    console.error('Error:', error);
+    errorEl.querySelector('.error-message').textContent = 
+      `Failed to load ${symbol}: ${error.message}`;
     errorEl.classList.remove('hidden');
+    return null;
   } finally {
     loadingEl.classList.add('hidden');
   }
 }
 
-// Helper function to create table row (updated for INR)
-function createStockRow(stock, quote, conversionRate) {
+// Updated createStockRow function
+function createStockRow(stock, data) {
   const row = document.createElement('tr');
   
-  const symbolCell = document.createElement('td');
-  symbolCell.textContent = stock.symbol.replace('.BO', '');
-  row.appendChild(symbolCell);
-  
-  const priceCell = document.createElement('td');
-  if (quote) {
-    const usdPrice = parseFloat(quote['05. price']);
-    const inrPrice = (usdPrice * conversionRate).toFixed(2);
-    priceCell.textContent = `₹${inrPrice}`;
-  } else {
-    priceCell.textContent = 'ERR';
-  }
-  row.appendChild(priceCell);
-  
-  const changeCell = document.createElement('td');
-  if (quote) {
-    const changePercent = quote['10. change percent'];
-    changeCell.textContent = changePercent;
-    changeCell.style.color = changePercent.startsWith('-') ? 'red' : 'green';
-  } else {
-    changeCell.textContent = 'No data';
-    changeCell.style.color = 'gray';
-  }
-  row.appendChild(changeCell);
-  
-  const notesCell = document.createElement('td');
-  notesCell.textContent = stock.notes;
-  row.appendChild(notesCell);
+  ['symbol', 'price', 'change', 'notes'].forEach(key => {
+    const cell = document.createElement('td');
+    cell.textContent = key === 'symbol' ? stock.symbol.replace('.BO', '') :
+                       key === 'price' ? (data?.price || 'ERR') :
+                       key === 'change' ? (data?.change || 'N/A') :
+                       stock.notes;
+    
+    if (key === 'change' && data) {
+      cell.style.color = data.rawChange >= 0 ? 'green' : 'red';
+    }
+    
+    row.appendChild(cell);
+  });
   
   return row;
 }
 
-// [Rest of the event listeners and initial load remain the same]
+// Initialize with Yahoo-compatible symbols
+const STOCKS = {
+  longTerm: [
+    { symbol: "RELIANCE.NS", notes: "Strong fundamentals" },
+    { symbol: "INFY.NS", notes: "Consistent revenue growth" }
+  ],
+  shortTerm: [
+    { symbol: "TATASTEEL.NS", notes: "Technical breakout" },
+    { symbol: "HDFCBANK.NS", notes: "Oversold conditions" }
+  ]
+};
+
+// Update tables
+async function updateStocks() {
+  const tables = {
+    long: document.getElementById('long-table').querySelector('tbody'),
+    short: document.getElementById('short-table').querySelector('tbody')
+  };
+  
+  tables.long.innerHTML = '';
+  tables.short.innerHTML = '';
+  
+  for (const stock of STOCKS.longTerm) {
+    const data = await fetchStockData(stock.symbol);
+    tables.long.appendChild(createStockRow(stock, data));
+  }
+  
+  for (const stock of STOCKS.shortTerm) {
+    const data = await fetchStockData(stock.symbol);
+    tables.short.appendChild(createStockRow(stock, data));
+  }
+}
+
+// Event listeners
+document.getElementById('refresh').addEventListener('click', updateStocks);
+document.getElementById('retry').addEventListener('click', updateStocks);
+
+// Initial load
+updateStocks();
