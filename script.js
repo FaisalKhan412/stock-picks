@@ -1,80 +1,113 @@
-// script.js
-const API_KEY = '6CUWCEKKTSLIXQ7L';
+// script.js — paste entire file (REPLACE existing)
+document.addEventListener('DOMContentLoaded', () => {
+  const API_KEY = (window.ALPHA_VANTAGE_API_KEY || "").trim();
 
-// Example stock lists
-const longTermStocks = [
+  const longTerm = [
     { symbol: "RELIANCE.BSE", notes: "Strong fundamentals" },
     { symbol: "INFY.BSE", notes: "Consistent revenue growth" }
-];
+  ];
 
-const shortTermStocks = [
-    { symbol: "TCS.BSE", notes: "Bullish technicals" },
+  const shortTerm = [
+    { symbol: "TCS.BSE", notes: "Breakout watch" },
     { symbol: "HDFCBANK.BSE", notes: "Short-term momentum" }
-];
+  ];
 
-// Fetch stock data from Alpha Vantage
-async function fetchStockData(symbol) {
+  const RATE_LIMIT_MS = 12000; // 12 seconds per request to respect free tier
+
+  const statusEl = document.getElementById('status');
+  const longTableBody = document.querySelector('#long-table tbody');
+  const shortTableBody = document.querySelector('#short-table tbody');
+
+  function setStatus(msg){
+    if (statusEl) statusEl.textContent = msg;
+    console.log('[status]', msg);
+  }
+
+  async function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  async function fetchDailyAdjusted(symbol){
+    if (!API_KEY) {
+      console.error('API key not found. Make sure config.js or config.example.js is loaded.');
+      return { symbol, price: "ERR", change: "No API key" };
+    }
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
     try {
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        console.log(symbol, data); // Debugging
+      const res = await fetch(url);
+      const json = await res.json();
+      console.log('AV response for', symbol, json);
 
-        // Error handling
-        if (data['Error Message'] || !data['Time Series (Daily)']) {
-            return { price: "ERR", change: "No data found" };
-        }
+      if (json.Note) {
+        return { symbol, price: "ERR", change: "Rate limit: " + (json.Note || "wait") };
+      }
+      if (json['Error Message'] || !json['Time Series (Daily)']) {
+        return { symbol, price: "ERR", change: "No data found" };
+      }
 
-        const dates = Object.keys(data['Time Series (Daily)']);
-        const latestDate = dates[0];
-        const prevDate = dates[1];
+      const ts = json['Time Series (Daily)'];
+      const dates = Object.keys(ts);
+      if (dates.length < 2) return { symbol, price: "ERR", change: "Insufficient data" };
 
-        const latestClose = parseFloat(data['Time Series (Daily)'][latestDate]['4. close']);
-        const prevClose = parseFloat(data['Time Series (Daily)'][prevDate]['4. close']);
+      const latest = ts[dates[0]];
+      const prev = ts[dates[1]];
+      const latestClose = parseFloat(latest['4. close']);
+      const prevClose = parseFloat(prev['4. close']);
+      const changePct = (((latestClose - prevClose) / prevClose) * 100).toFixed(2);
 
-        const changePercent = (((latestClose - prevClose) / prevClose) * 100).toFixed(2);
-
-        return {
-            price: latestClose.toFixed(2),
-            change: `${changePercent}%`
-        };
-    } catch (error) {
-        console.error("Error fetching data for", symbol, error);
-        return { price: "ERR", change: "No data found" };
+      return {
+        symbol,
+        price: latestClose.toFixed(2),
+        change: changePct + '%'
+      };
+    } catch (err) {
+      console.error('Fetch error for', symbol, err);
+      return { symbol, price: "ERR", change: "Fetch error" };
     }
-}
+  }
 
-// Render stocks in the table
-async function renderStocks(stocks) {
-    const tableBody = document.getElementById("stock-table-body");
-    tableBody.innerHTML = "";
-
-    for (const stock of stocks) {
-        const { price, change } = await fetchStockData(stock.symbol);
-
-        const row = `
-            <tr>
-                <td>${stock.symbol}</td>
-                <td>${price}</td>
-                <td>${change}</td>
-                <td>${stock.notes}</td>
-            </tr>
-        `;
-        tableBody.innerHTML += row;
-
-        // Avoid hitting API rate limit (5 requests/minute)
-        await new Promise(resolve => setTimeout(resolve, 15000)); // 15 seconds delay
+  async function populateTable(list, tbody){
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    setStatus(`Fetching ${list.length} symbols...`);
+    for (let i = 0; i < list.length; i++){
+      const item = list[i];
+      setStatus(`Fetching ${item.symbol} (${i+1}/${list.length})...`);
+      const q = await fetchDailyAdjusted(item.symbol);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${q.symbol}</td><td>${q.price}</td><td>${q.change}</td><td>${item.notes||''}</td>`;
+      tbody.appendChild(tr);
+      if (i < list.length - 1) await sleep(RATE_LIMIT_MS);
     }
+    setStatus("Done at " + new Date().toLocaleTimeString());
+  }
 
-    document.getElementById("last-updated").textContent = `Done at ${new Date().toLocaleTimeString()}`;
-}
+  // UI: tabs and refresh (IDs must match those in your index.html)
+  const btnLong = document.getElementById('tab-long');
+  const btnShort = document.getElementById('tab-short');
+  const btnRefresh = document.getElementById('refresh');
 
-// Button events
-document.getElementById("btn-long").addEventListener("click", () => renderStocks(longTermStocks));
-document.getElementById("btn-short").addEventListener("click", () => renderStocks(shortTermStocks));
-document.getElementById("btn-refresh").addEventListener("click", () => renderStocks(longTermStocks));
+  if (btnLong) btnLong.addEventListener('click', () => {
+    document.getElementById('long-section').classList.remove('hidden');
+    document.getElementById('short-section').classList.add('hidden');
+    btnLong.classList.add('active');
+    btnShort.classList.remove('active');
+  });
 
-// Default load
-renderStocks(longTermStocks);
+  if (btnShort) btnShort.addEventListener('click', () => {
+    document.getElementById('short-section').classList.remove('hidden');
+    document.getElementById('long-section').classList.add('hidden');
+    btnShort.classList.add('active');
+    btnLong.classList.remove('active');
+  });
 
+  if (btnRefresh) btnRefresh.addEventListener('click', async () => {
+    const shortHidden = document.getElementById('short-section').classList.contains('hidden');
+    if (!shortHidden) {
+      await populateTable(shortTerm, shortTableBody);
+    } else {
+      await populateTable(longTerm, longTableBody);
+    }
+  });
 
+  // initial load: long-term table
+  populateTable(longTerm, longTableBody);
+});
