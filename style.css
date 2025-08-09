@@ -1,0 +1,47 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 1000px;
+  margin: 20px auto;
+  padding: 0 16px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+nav button {
+  margin-left: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+nav button.active {
+  background: #007bff;
+  color: white;
+}
+
+.tab {
+  margin-top: 18px;
+}
+
+.hidden {
+  display: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+#status {
+  margin-top: 12px;
+  color: #555;
+}

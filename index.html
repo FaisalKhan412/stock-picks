@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stock Picks — Long & Short</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Stock Picks</h1>
+    <nav>
+      <button id="tab-long" class="active">Long (Fundamental)</button>
+      <button id="tab-short">Short (Technical)</button>
+      <button id="refresh">Refresh</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="long-section" class="tab">
+      <h2>Long-term picks</h2>
+      <table id="long-table">
+        <thead>
+          <tr><th>Symbol</th><th>Price</th><th>Change %</th><th>Notes</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="short-section" class="tab hidden">
+      <h2>Short-term picks</h2>
+      <table id="short-table">
+        <thead>
+          <tr><th>Symbol</th><th>Price</th><th>Change %</th><th>Notes</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <div id="status"></div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
