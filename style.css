@@ -1,9 +1,9 @@
-/* Basic Reset */
+/* style.css - Optimized for stock display */
 * {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
-  font-family: Arial, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
@@ -11,6 +11,7 @@ body {
   max-width: 1000px;
   margin: 0 auto;
   line-height: 1.6;
+  color: #333;
 }
 
 header {
@@ -20,54 +21,57 @@ header {
 }
 
 h1, h2 {
-  color: #333;
+  color: #2c3e50;
 }
 
 nav {
   margin: 15px 0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 button {
   padding: 8px 15px;
-  margin-right: 10px;
-  background: #007bff;
+  background: #3498db;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  transition: background 0.3s;
 }
 
 button.active {
-  background: #0056b3;
+  background: #2980b9;
   font-weight: bold;
 }
 
 button:hover {
-  background: #0069d9;
+  background: #2980b9;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   margin: 20px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 th, td {
-  padding: 12px;
+  padding: 12px 15px;
   text-align: left;
   border-bottom: 1px solid #ddd;
 }
 
 th {
   background-color: #f8f9fa;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 tr:hover {
   background-color: #f5f5f5;
 }
 
-/* Loading and Error States */
 .hidden {
   display: none;
 }
@@ -75,36 +79,48 @@ tr:hover {
 #loading {
   text-align: center;
   padding: 20px;
-  font-style: italic;
   color: #666;
 }
 
 #error {
   text-align: center;
   padding: 20px;
+  background: #f8d7da;
+  border-radius: 4px;
+  margin: 20px 0;
 }
 
 .error-message {
-  color: #dc3545;
-  padding: 10px;
-  border: 1px solid #dc3545;
-  background-color: #f8d7da;
-  border-radius: 4px;
+  color: #721c24;
   margin-bottom: 10px;
 }
 
 #retry {
   background: #dc3545;
-  color: white;
 }
 
 #retry:hover {
   background: #c82333;
 }
 
-/* Status message */
 #status {
-  color: #28a745;
   padding: 10px;
-  margin-top: 10px;
+  margin-top: 20px;
+  font-size: 0.9em;
+}
+
+/* Tab system */
+.tab {
+  display: block;
+}
+
+.tab.hidden {
+  display: none;
+}
+
+/* Responsive tables */
+@media (max-width: 600px) {
+  th, td {
+    padding: 8px 10px;
+  }
 }
