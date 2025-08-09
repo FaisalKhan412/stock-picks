@@ -1,79 +1,80 @@
-const API_KEY = (window.ALPHA_VANTAGE_API_KEY || "").trim();
+// script.js
+const API_KEY = '6CUWCEKKTSLIXQ7L';
 
-const longTerm = [
-  { symbol: "RELIANCE.BSE", notes: "Strong fundamentals" },
-  { symbol: "INFY.BSE", notes: "Consistent revenue growth" }
+// Example stock lists
+const longTermStocks = [
+    { symbol: "RELIANCE.BSE", notes: "Strong fundamentals" },
+    { symbol: "INFY.BSE", notes: "Consistent revenue growth" }
 ];
 
-const shortTerm = [
-  { symbol: "TCS.BSE", notes: "Breakout watch" },
-  { symbol: "HDFC.BSE", notes: "Momentum play" }
+const shortTermStocks = [
+    { symbol: "TCS.BSE", notes: "Bullish technicals" },
+    { symbol: "HDFCBANK.BSE", notes: "Short-term momentum" }
 ];
 
-const RATE_LIMIT_MS = 12000; // 5 requests/minute on free tier
+// Fetch stock data from Alpha Vantage
+async function fetchStockData(symbol) {
+    try {
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        console.log(symbol, data); // Debugging
 
-const statusEl = document.getElementById('status');
-const longTableBody = document.querySelector('#long-table tbody');
-const shortTableBody = document.querySelector('#short-table tbody');
+        // Error handling
+        if (data['Error Message'] || !data['Time Series (Daily)']) {
+            return { price: "ERR", change: "No data found" };
+        }
 
-function setStatus(msg) {
-  statusEl.textContent = msg;
+        const dates = Object.keys(data['Time Series (Daily)']);
+        const latestDate = dates[0];
+        const prevDate = dates[1];
+
+        const latestClose = parseFloat(data['Time Series (Daily)'][latestDate]['4. close']);
+        const prevClose = parseFloat(data['Time Series (Daily)'][prevDate]['4. close']);
+
+        const changePercent = (((latestClose - prevClose) / prevClose) * 100).toFixed(2);
+
+        return {
+            price: latestClose.toFixed(2),
+            change: `${changePercent}%`
+        };
+    } catch (error) {
+        console.error("Error fetching data for", symbol, error);
+        return { price: "ERR", change: "No data found" };
+    }
 }
 
-async function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+// Render stocks in the table
+async function renderStocks(stocks) {
+    const tableBody = document.getElementById("stock-table-body");
+    tableBody.innerHTML = "";
+
+    for (const stock of stocks) {
+        const { price, change } = await fetchStockData(stock.symbol);
+
+        const row = `
+            <tr>
+                <td>${stock.symbol}</td>
+                <td>${price}</td>
+                <td>${change}</td>
+                <td>${stock.notes}</td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+
+        // Avoid hitting API rate limit (5 requests/minute)
+        await new Promise(resolve => setTimeout(resolve, 15000)); // 15 seconds delay
+    }
+
+    document.getElementById("last-updated").textContent = `Done at ${new Date().toLocaleTimeString()}`;
 }
 
-async function fetchGlobalQuote(symbol) {
-  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
-  try {
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json.Note) throw new Error("API limit reached. Wait and try again.");
-    const g = json["Global Quote"];
-    if (!g || Object.keys(g).length === 0) throw new Error("No data found");
-    return {
-      symbol: g["01. symbol"] || symbol,
-      price: g["05. price"] || "N/A",
-      changePercent: g["10. change percent"] || "N/A"
-    };
-  } catch (err) {
-    return { symbol, price: "ERR", changePercent: err.message };
-  }
-}
+// Button events
+document.getElementById("btn-long").addEventListener("click", () => renderStocks(longTermStocks));
+document.getElementById("btn-short").addEventListener("click", () => renderStocks(shortTermStocks));
+document.getElementById("btn-refresh").addEventListener("click", () => renderStocks(longTermStocks));
 
-async function populateTable(list, tbody) {
-  tbody.innerHTML = "";
-  setStatus("Fetching data...");
-  for (let i = 0; i < list.length; i++) {
-    setStatus(`Fetching ${list[i].symbol} (${i + 1}/${list.length})...`);
-    const q = await fetchGlobalQuote(list[i].symbol);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${q.symbol}</td><td>${q.price}</td><td>${q.changePercent}</td><td>${list[i].notes}</td>`;
-    tbody.appendChild(tr);
-    if (i < list.length - 1) await sleep(RATE_LIMIT_MS);
-  }
-  setStatus("Done at " + new Date().toLocaleTimeString());
-}
+// Default load
+renderStocks(longTermStocks);
 
-document.getElementById('tab-long').addEventListener('click', () => {
-  document.getElementById('long-section').classList.remove('hidden');
-  document.getElementById('short-section').classList.add('hidden');
-  document.getElementById('tab-long').classList.add('active');
-  document.getElementById('tab-short').classList.remove('active');
-});
-document.getElementById('tab-short').addEventListener('click', () => {
-  document.getElementById('short-section').classList.remove('hidden');
-  document.getElementById('long-section').classList.add('hidden');
-  document.getElementById('tab-short').classList.add('active');
-  document.getElementById('tab-long').classList.remove('active');
-});
-document.getElementById('refresh').addEventListener('click', refreshAll);
-
-async function refreshAll() {
-  await populateTable(longTerm, longTableBody);
-  await populateTable(shortTerm, shortTableBody);
-}
-
-refreshAll();
 
