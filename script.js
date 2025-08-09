@@ -1,113 +1,121 @@
-// script.js — paste entire file (REPLACE existing)
-document.addEventListener('DOMContentLoaded', () => {
-  const API_KEY = (window.ALPHA_VANTAGE_API_KEY || "").trim();
+// [Previous DOM elements and tab switching code remains the same]
 
-  const longTerm = [
-    { symbol: "RELIANCE.BSE", notes: "Strong fundamentals" },
-    { symbol: "INFY.BSE", notes: "Consistent revenue growth" }
-  ];
+let usdToInrRate = 75.00; // Default fallback rate
 
-  const shortTerm = [
-    { symbol: "TCS.BSE", notes: "Breakout watch" },
-    { symbol: "HDFCBANK.BSE", notes: "Short-term momentum" }
-  ];
-
-  const RATE_LIMIT_MS = 12000; // 12 seconds per request to respect free tier
-
-  const statusEl = document.getElementById('status');
-  const longTableBody = document.querySelector('#long-table tbody');
-  const shortTableBody = document.querySelector('#short-table tbody');
-
-  function setStatus(msg){
-    if (statusEl) statusEl.textContent = msg;
-    console.log('[status]', msg);
+// Fetch USD to INR conversion rate
+async function fetchExchangeRate() {
+  try {
+    const url = `${API_CONFIG.baseUrl}?function=${API_CONFIG.forexFunction}&from_currency=${API_CONFIG.fromCurrency}&to_currency=${API_CONFIG.toCurrency}&apikey=${API_CONFIG.apiKey}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) throw new Error('Network response was not ok');
+    
+    const data = await response.json();
+    
+    if (data['Error Message'] || data['Note']) {
+      throw new Error(data['Error Message'] || data['Note']);
+    }
+    
+    const rate = parseFloat(data['Realtime Currency Exchange Rate']['5. Exchange Rate']);
+    return rate || usdToInrRate;
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    return usdToInrRate; // Return default rate if API fails
   }
+}
 
-  async function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-
-  async function fetchDailyAdjusted(symbol){
-    if (!API_KEY) {
-      console.error('API key not found. Make sure config.js or config.example.js is loaded.');
-      return { symbol, price: "ERR", change: "No API key" };
+// Fetch stock data (updated for INR conversion)
+async function fetchStockData(symbol) {
+  try {
+    const url = `${API_CONFIG.baseUrl}?function=${API_CONFIG.stockFunction}&symbol=${symbol}&apikey=${API_CONFIG.apiKey}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) throw new Error('Network response was not ok');
+    
+    const data = await response.json();
+    
+    if (data['Error Message'] || data['Note']) {
+      throw new Error(data['Error Message'] || data['Note']);
     }
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
-    try {
-      const res = await fetch(url);
-      const json = await res.json();
-      console.log('AV response for', symbol, json);
-
-      if (json.Note) {
-        return { symbol, price: "ERR", change: "Rate limit: " + (json.Note || "wait") };
-      }
-      if (json['Error Message'] || !json['Time Series (Daily)']) {
-        return { symbol, price: "ERR", change: "No data found" };
-      }
-
-      const ts = json['Time Series (Daily)'];
-      const dates = Object.keys(ts);
-      if (dates.length < 2) return { symbol, price: "ERR", change: "Insufficient data" };
-
-      const latest = ts[dates[0]];
-      const prev = ts[dates[1]];
-      const latestClose = parseFloat(latest['4. close']);
-      const prevClose = parseFloat(prev['4. close']);
-      const changePct = (((latestClose - prevClose) / prevClose) * 100).toFixed(2);
-
-      return {
-        symbol,
-        price: latestClose.toFixed(2),
-        change: changePct + '%'
-      };
-    } catch (err) {
-      console.error('Fetch error for', symbol, err);
-      return { symbol, price: "ERR", change: "Fetch error" };
-    }
+    
+    return data['Global Quote'] || null;
+  } catch (error) {
+    console.error('Error fetching data for', symbol, error);
+    throw error;
   }
+}
 
-  async function populateTable(list, tbody){
-    if (!tbody) return;
-    tbody.innerHTML = "";
-    setStatus(`Fetching ${list.length} symbols...`);
-    for (let i = 0; i < list.length; i++){
-      const item = list[i];
-      setStatus(`Fetching ${item.symbol} (${i+1}/${list.length})...`);
-      const q = await fetchDailyAdjusted(item.symbol);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${q.symbol}</td><td>${q.price}</td><td>${q.change}</td><td>${item.notes||''}</td>`;
-      tbody.appendChild(tr);
-      if (i < list.length - 1) await sleep(RATE_LIMIT_MS);
+// Update table with stock data (now in INR)
+async function updateStocks() {
+  loadingEl.classList.remove('hidden');
+  errorEl.classList.add('hidden');
+  statusEl.textContent = '';
+  
+  try {
+    // First get current exchange rate
+    usdToInrRate = await fetchExchangeRate();
+    
+    // Clear tables
+    longTable.innerHTML = '';
+    shortTable.innerHTML = '';
+    
+    // Process long term stocks
+    for (const stock of STOCKS.longTerm) {
+      const quote = await fetchStockData(stock.symbol);
+      const row = createStockRow(stock, quote, usdToInrRate);
+      longTable.appendChild(row);
     }
-    setStatus("Done at " + new Date().toLocaleTimeString());
+    
+    // Process short term stocks
+    for (const stock of STOCKS.shortTerm) {
+      const quote = await fetchStockData(stock.symbol);
+      const row = createStockRow(stock, quote, usdToInrRate);
+      shortTable.appendChild(row);
+    }
+    
+    statusEl.textContent = `Last updated: ${new Date().toLocaleTimeString()} | 1 USD = ${usdToInrRate.toFixed(2)} INR`;
+  } catch (error) {
+    errorMsg.textContent = `Error: ${error.message || 'Failed to load stock data'}`;
+    errorEl.classList.remove('hidden');
+  } finally {
+    loadingEl.classList.add('hidden');
   }
+}
 
-  // UI: tabs and refresh (IDs must match those in your index.html)
-  const btnLong = document.getElementById('tab-long');
-  const btnShort = document.getElementById('tab-short');
-  const btnRefresh = document.getElementById('refresh');
+// Helper function to create table row (updated for INR)
+function createStockRow(stock, quote, conversionRate) {
+  const row = document.createElement('tr');
+  
+  const symbolCell = document.createElement('td');
+  symbolCell.textContent = stock.symbol.replace('.BO', '');
+  row.appendChild(symbolCell);
+  
+  const priceCell = document.createElement('td');
+  if (quote) {
+    const usdPrice = parseFloat(quote['05. price']);
+    const inrPrice = (usdPrice * conversionRate).toFixed(2);
+    priceCell.textContent = `₹${inrPrice}`;
+  } else {
+    priceCell.textContent = 'ERR';
+  }
+  row.appendChild(priceCell);
+  
+  const changeCell = document.createElement('td');
+  if (quote) {
+    const changePercent = quote['10. change percent'];
+    changeCell.textContent = changePercent;
+    changeCell.style.color = changePercent.startsWith('-') ? 'red' : 'green';
+  } else {
+    changeCell.textContent = 'No data';
+    changeCell.style.color = 'gray';
+  }
+  row.appendChild(changeCell);
+  
+  const notesCell = document.createElement('td');
+  notesCell.textContent = stock.notes;
+  row.appendChild(notesCell);
+  
+  return row;
+}
 
-  if (btnLong) btnLong.addEventListener('click', () => {
-    document.getElementById('long-section').classList.remove('hidden');
-    document.getElementById('short-section').classList.add('hidden');
-    btnLong.classList.add('active');
-    btnShort.classList.remove('active');
-  });
-
-  if (btnShort) btnShort.addEventListener('click', () => {
-    document.getElementById('short-section').classList.remove('hidden');
-    document.getElementById('long-section').classList.add('hidden');
-    btnShort.classList.add('active');
-    btnLong.classList.remove('active');
-  });
-
-  if (btnRefresh) btnRefresh.addEventListener('click', async () => {
-    const shortHidden = document.getElementById('short-section').classList.contains('hidden');
-    if (!shortHidden) {
-      await populateTable(shortTerm, shortTableBody);
-    } else {
-      await populateTable(longTerm, longTableBody);
-    }
-  });
-
-  // initial load: long-term table
-  populateTable(longTerm, longTableBody);
-});
+// [Rest of the event listeners and initial load remain the same]

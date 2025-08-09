@@ -37,11 +37,20 @@
       </table>
     </section>
 
+    <!-- Loading and error indicators -->
+    <div id="loading" class="hidden">
+      <p>Loading stock data...</p>
+    </div>
+    
+    <div id="error" class="hidden">
+      <p class="error-message"></p>
+      <button id="retry">Try Again</button>
+    </div>
+    
     <div id="status"></div>
   </main>
 
-    <script src="config.js"></script>
-<script src="script.js"></script>
-
+  <script src="config.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
